@@ -8,7 +8,7 @@ import time  # Para simular o tempo de análise
 
 # Inicialize a API do Gemini
 try:
-    genai.configure(api_key="AIzaSyCm6Ad-i69_Rmxv8nIRFV_ty8aMMNgrp6A")  # Substitua pela sua chave de API do Gemini
+    genai.configure(api_key="GEMINI_API_KEY")  # Substitua pela sua chave de API do Gemini
     model = genai.GenerativeModel('gemini-2.0-flash')
 except Exception as e:
     st.error(f"Erro ao inicializar a API do Gemini: {e}. Por favor, verifique se a sua chave de API está correta e foi substituída no código.")
