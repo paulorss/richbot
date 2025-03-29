@@ -13,7 +13,7 @@ import subprocess # Importa o módulo subprocess para instalar o ta
 import os # Importa o módulo os para acessar variáveis de ambiente
 
 
-api_key = st.secrets["GEMINI_API_KEY"]
+api_key = "GEMINI_API_KEY"
 
 genai.configure(api_key=api_key)  # Substitua pela sua chave de API do Gemini
 model = genai.GenerativeModel('gemini-2.0-flash')
