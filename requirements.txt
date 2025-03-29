@@ -1,0 +1,7 @@
+streamlit
+pandas
+fundamentus
+google-generativeai
+yfinance
+ta
+plotly
