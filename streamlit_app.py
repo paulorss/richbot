@@ -1,30 +1,16 @@
 import streamlit as st
 import pandas as pd
-import fundamentus  # Para obter os dados da B3
-import google.generativeai as genai  # Para usar a API do Gemini
+import fundamentus
+import google.generativeai as genai
 from urllib.error import HTTPError
-import threading  # Para executar a análise em segundo plano
-import time  # Para simular o tempo de análise
-import yfinance as yf # Para obter dados históricos do ativo
-import ta # Para indicadores técnicos
-import plotly.graph_objects as go # Para criar os gráficos
-from plotly.subplots import make_subplots # Para criar subplots
-import subprocess # Importa o módulo subprocess para instalar o ta
-import os # Importa o módulo os para acessar variáveis de ambiente
-
-# Inicialize a API do Gemini
-try:
-    # Acessa a chave da API a partir da variável de ambiente
-    gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    if gemini_api_key:
-        genai.configure(api_key=gemini_api_key)
-        model = genai.GenerativeModel('gemini-2.0-flash')
-    else:
-        st.error("Chave da API do Gemini não encontrada. Por favor, defina a variável de ambiente 'GEMINI_API_KEY'.")
-        model = None  # Define model como None para evitar erros futuros
-except Exception as e:
-    st.error(f"Erro ao inicializar a API do Gemini: {e}. Por favor, verifique se a sua chave de API está correta e foi definida como variável de ambiente.")
-    model = None  # Define model como None para evitar erros futuros
+import threading
+import time
+import yfinance as yf
+import ta
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import subprocess
+import os
 
 # Defina a lista de ações da B3
 acoes = [
@@ -50,7 +36,6 @@ def obter_dados_acao(acao):
     try:
         pipeline = fundamentus.Pipeline(acao)
         response = pipeline.get_all_information()
-        # Verifica se a resposta contém os dados esperados
         if not response or not hasattr(response, 'transformed_information'):
             print(f"Erro ao obter dados para {acao}: Resposta da API incompleta.")
             return None
@@ -71,7 +56,6 @@ def preparar_dados_para_ia(dados, acao):
     if dados is None:
         return None
 
-    # Verifica se as chaves existem antes de acessá-las
     price_info = dados.get('price_information', {})
     detailed_info = dados.get('detailed_information', {})
     valuation_indicators = dados.get('valuation_indicators', {})
@@ -80,7 +64,6 @@ def preparar_dados_para_ia(dados, acao):
     balance_sheet_data = dados.get('balance_sheet', {})
     income_statement_data = dados.get('income_statement_data', {})
 
-    # Extrai os dados, com tratamento de KeyError
     try:
         data = {
             "acao": acao,
@@ -110,7 +93,7 @@ def preparar_dados_para_ia(dados, acao):
             "preco_ativ_circ_liq": valuation_indicators.get('price_divided_by_net_current_assets', None).value if valuation_indicators.get('price_divided_by_net_current_assets') else None,
             "dividend_yield": valuation_indicators.get('dividend_yield', None).value if valuation_indicators.get('dividend_yield') else None,
             "ev_ebitda": valuation_indicators.get('enterprise_value_by_ebitda', None).value if valuation_indicators.get('enterprise_value_by_ebitda') else None,
-            "ev_ebit": valuation_indicators.get('enterprise_value_by_ebit', None), # Corrigido esta linha
+            "ev_ebit": valuation_indicators.get('enterprise_value_by_ebit', None),
             "preco_capital_giro": valuation_indicators.get('price_by_working_capital', None).value if valuation_indicators.get('price_by_working_capital') else None,
             "roe": profitability_indicators.get('return_on_equity', None).value if profitability_indicators.get('return_on_equity') else None,
             "roic": profitability_indicators.get('return_on_invested_capital', None).value if profitability_indicators.get('return_on_invested_capital') else None,
@@ -121,10 +104,10 @@ def preparar_dados_para_ia(dados, acao):
             "margem_ebit": profitability_indicators.get('ebit_divided_by_net_revenue', None).value if profitability_indicators.get('ebit_divided_by_net_revenue') else None,
             "margem_liquida": profitability_indicators.get('net_income_divided_by_net_revenue', None).value if profitability_indicators.get('net_income_divided_by_net_revenue') else None,
             "liquidez_corrente": dados.get('indebtedness_indicators', {}).get('current_liquidity', None).value if dados.get('indebtedness_indicators', {}).get('current_liquidity') else None,
-            "divida_bruta_patrimonio": dados.get('indebtedness_indicators', {}).get('gross_debt_by_equity', None).value if dados.get('indebtedness_indicators', {}).get('gross_debt_by_equity') else None,
-            "divida_liquida_patrimonio": dados.get('indebtedness_indicators', {}).get('net_debt_by_equity', None).value if dados.get('indebtedness_indicators', {}).get('net_debt_by_equity') else None,
+            "divida_bruta_patrimonio": dados.get('indebtedness_indicators', {}).get('gross_debt_by_equity', None).value if dados.get('gross_debt_by_equity') else None,
+            "divida_liquida_patrimonio": dados.get('indebtedness_indicators', {}).get('net_debt_by_equity', None).value if dados.get('net_debt_by_equity') else None,
             "divida_liquida_ebitda": dados.get('indebtedness_indicators', {}).get('net_debt_by_ebitda', None).value if dados.get('indebtedness_indicators', {}).get('net_debt_by_ebitda') else None,
-            "patrimonio_ativos": dados.get('indebtedness_indicators', {}).get('equity_by_total_assets', None).value if dados.get('indebtedness_indicators', {}).get('equity_by_total_assets') else None,
+            "patrimonio_ativos": dados.get('indebtedness_indicators', {}).get('equity_by_total_assets', None).value if dados.get('equity_by_total_assets') else None,
             "total_ativos": balance_sheet_data.get('total_assets', None).value if balance_sheet_data.get('total_assets') else None,
             "ativo_circulante": balance_sheet_data.get('current_assets', None).value if balance_sheet_data.get('current_assets') else None,
             "disponibilidades": balance_sheet_data.get('cash', None).value if balance_sheet_data.get('cash') else None,
@@ -147,7 +130,7 @@ def preparar_dados_para_ia(dados, acao):
         return None
 
 # Função para enviar a análise para o Gemini
-def enviar_analise_para_ia(data):
+def enviar_analise_para_ia(data, gemini_model): # Passa o modelo como argumento
     prompt_text = f"""
         Analise os dados da ação {data['acao']} e forneça uma análise qualitativa completa,
         baseada no histórico, indicando se o ativo representa uma oportunidade de compra
@@ -224,11 +207,11 @@ def enviar_analise_para_ia(data):
         Lucro Líquido 12 Meses: {data['lucro_liquido_12meses']}
     """
 
-    if model is None:
-        return None, "Erro: Modelo de IA não inicializado."  # Retorna None e mensagem de erro
+    if gemini_model is None:
+        return None, "Erro: Modelo de IA não inicializado."
 
     try:
-        response = model.generate_content(prompt_text)
+        response = gemini_model.generate_content(prompt_text)
         analise = response.text
         # Classifica a recomendação (simplificado para demonstração)
         if "compra" in analise.lower() or "positivo" in analise.lower():
@@ -242,7 +225,7 @@ def enviar_analise_para_ia(data):
         print(f"Erro ao enviar prompt para o Gemini: {e}")
         return None, f"Erro ao obter análise da IA: {e}"
 
-def analisar_acao(acao, resultados, acao_status):
+def analisar_acao(acao, resultados, acao_status, gemini_model): # Passa o modelo para a função
     dados_acao = obter_dados_acao(acao)
     if dados_acao is None:
         resultados[acao] = {"erro": f"Não foi possível obter dados para a ação {acao}."}
@@ -255,7 +238,7 @@ def analisar_acao(acao, resultados, acao_status):
         acao_status[acao] = "Erro"
         return
 
-    analise_ia, classificacao = enviar_analise_para_ia(dados_para_ia) # Recebe a análise e a classificação
+    analise_ia, classificacao = enviar_analise_para_ia(dados_para_ia, gemini_model) # Passa o modelo
     if analise_ia is None:
         resultados[acao] = {"erro": f"Erro ao obter análise da IA para a ação {acao}."}
         acao_status[acao] = "Erro"
@@ -267,14 +250,14 @@ def analisar_acao(acao, resultados, acao_status):
     # Obter dados para o gráfico
     try:
         ticket = yf.Ticker(f"{acao}.SA")
-        hist = ticket.history(period="1y") # Pega o histórico de 1 ano
+        hist = ticket.history(period="1y")
         price_series = hist['Close'].to_dict()
         volume_series = hist['Volume'].to_dict()
 
         # Tenta instalar a biblioteca ta e a importa
         try:
             subprocess.run(['pip', 'install', 'ta'], check=True)
-            import ta # Importa ta
+            import ta
         except Exception as e:
             print(f"Erro ao instalar a biblioteca 'ta': {e}")
             resultados[acao] = {"erro": f"Erro ao instalar a biblioteca 'ta': {e}.  Verifique se o pip está instalado e o ambiente virtual está configurado corretamente. A análise da ação {acao} será feita sem os indicadores técnicos."}
@@ -301,7 +284,7 @@ def analisar_acao(acao, resultados, acao_status):
         # Calcular RSI
         try:
             hist['RSI'] = ta.momentum.rsi(hist['Close'], window=14)
-            rsi_value = hist['RSI'].iloc[-1]  # Obtém o último valor de RSI
+            rsi_value = hist['RSI'].iloc[-1]
         except Exception as e:
             print(f"Erro ao calcular RSI para a ação {acao}: {e}")
             rsi_value = None
@@ -316,21 +299,18 @@ def analisar_acao(acao, resultados, acao_status):
         print(f"Erro ao obter dados para gráfico de {acao}: {e}")
         chart_data = None
 
-    # Converter o dicionário em um DataFrame para exibição
-    df_dados = pd.DataFrame([dados_para_ia])
-    resultados[acao] = {"analise": analise_ia, "classificacao": classificacao, "dados": df_dados, "chart_data": chart_data} # Armazena a classificação e os dados e os dados do gráfico
-    acao_status[acao] = "Concluído" #Atualiza o status da ação
+    resultados[acao] = {"analise": analise_ia, "classificacao": classificacao, "dados": df_dados, "chart_data": chart_data}
+    acao_status[acao] = "Concluído"
 
-def iniciar_analise(acoes_selecionadas, resultados, acao_status, analise_concluida):
+def iniciar_analise(acoes_selecionadas, resultados, acao_status, analise_concluida, gemini_model): # Passa o modelo
     for acao in acoes_selecionadas:
-        acao_status[acao] = "Analisando" # Define o status da ação como "Analisando"
-        thread = threading.Thread(target=analisar_acao, args=(acao, resultados, acao_status))
+        acao_status[acao] = "Analisando"
+        thread = threading.Thread(target=analisar_acao, args=(acao, resultados, acao_status, gemini_model)) # Passa o modelo
         thread.start()
-    # Aguarda a conclusão de todas as threads
     while any(status != "Concluído" and status != "Erro" for status in acao_status.values()):
-        time.sleep(1)  # Aguarda 1 segundo
+        time.sleep(1)
 
-    analise_concluida.set() # Sinaliza que a análise foi concluída
+    analise_concluida.set()
 
 # Função para plotar o gráfico do ativo
 def plot_asset_chart(ticker, data):
@@ -361,13 +341,13 @@ def plot_asset_chart(ticker, data):
         ma_values = data.get('ma_values', {})
         for ma_name, ma_value in ma_values.items():
             if ma_name == 'MA9':
-                color = '#FF6D00'  # Laranja
+                color = '#FF6D00'
             elif ma_name == 'MA20':
-                color = '#00C853'  # Verde
+                color = '#00C853'
             elif ma_name == 'MA50':
-                color = '#D500F9'  # Roxo
+                color = '#D500F9'
             else:
-                color = '#757575'  # Cinza
+                color = '#757575'
 
             # Converter ma_value para lista
             ma_list = list(ma_value.values())
@@ -409,7 +389,7 @@ def plot_asset_chart(ticker, data):
                 text=f"RSI: {data['rsi']:.1f}",
                 showarrow=True,
                 arrowhead=1,
-                bgcolor="#FFECB3" if data['rsi'] < 30 else "#E1F5FE" # Muda a cor de fundo dependendo se está sobrecomprado ou sobrevendido
+                bgcolor="#FFECB3" if data['rsi'] < 30 else "#E1F5FE"
             )
 
         # Ajustar layout
@@ -431,35 +411,45 @@ def main():
     st.title("Análise de Ações da B3 com IA")
     st.write("Clique no botão para analisar as ações selecionadas.")
 
+    gemini_api_key = st.text_input("Insira sua chave da API do Gemini:", type="password") # Pede a chave da API
+    if not gemini_api_key:
+        st.warning("Por favor, insira sua chave da API do Gemini para continuar.")
+        return  # Para a execução se a chave não for fornecida
+
+    try:
+        genai.configure(api_key=gemini_api_key)
+        gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+    except Exception as e:
+        st.error(f"Erro ao inicializar a API do Gemini: {e}. Por favor, verifique se a sua chave de API está correta.")
+        return
+
     acoes_selecionadas = st.multiselect("Selecione as Ações", acoes, default=["ITUB4", "PETR4"])
     resultados = {}
-    acao_status = {acao: "Pendente" for acao in acoes_selecionadas}  # Rastreia o status de cada ação
+    acao_status = {acao: "Pendente" for acao in acoes_selecionadas}
     analise_concluida = threading.Event()
     if st.button("Analisar Ações Selecionadas"):
-        st.session_state.analise_iniciada = True # Define a variável de estado
-        st.session_state.resultados = {} # Armazena os resultados no estado da sessão
-        st.session_state.acao_status = {} # Armazena o status da ação
+        st.session_state.analise_iniciada = True
+        st.session_state.resultados = {}
+        st.session_state.acao_status = {}
         st.session_state.analise_concluida = threading.Event()
 
         with st.spinner("Analisando ações..."):
-            thread_analise = threading.Thread(target=iniciar_analise, args=(acoes_selecionadas, st.session_state.resultados, st.session_state.acao_status, st.session_state.analise_concluida))
+            thread_analise = threading.Thread(target=iniciar_analise, args=(acoes_selecionadas, st.session_state.resultados, st.session_state.acao_status, st.session_state.analise_concluida, gemini_model)) # Passa o modelo
             thread_analise.start()
-            # Exibe o status de cada ação
             while not st.session_state.analise_concluida.is_set():
                 status_texto = "Status da Análise:\n"
                 for acao, status in st.session_state.acao_status.items():
                     status_texto += f"- {acao}: {status}\n"
-                #st.text(status_texto)
-                time.sleep(1) # Atualiza o status a cada segundo
+                time.sleep(1)
             
-            status_texto = "Status da Análise:\n" #Exibe o status final
+            status_texto = "Status da Análise:\n"
             for acao, status in st.session_state.acao_status.items():
                 status_texto += f"- {acao}: {status}\n"
             st.text(status_texto)
         
-    if st.session_state.get("analise_iniciada"): # Verifica se a análise foi iniciada
+    if st.session_state.get("analise_iniciada"):
         if not st.session_state.analise_concluida.is_set():
-            st.warning("A análise ainda estáem andamento. Aguarde a conclusão.")
+            st.warning("A análise ainda está em andamento. Aguarde a conclusão.")
         else:
             resultados = st.session_state.resultados
             st.header("Resultados da Análise")
@@ -471,9 +461,8 @@ def main():
                     st.error(f"Erro na análise da ação {acao}: {resultado['erro']}")
                 else:
                     st.subheader(f"Análise para {acao}")
-                    #st.write(f"Classificação: {resultado['classificacao']}") # Exibe a classificação
                     st.write(resultado['analise'])
-                    st.dataframe(resultado['dados']) # Exibe os dados da ação
+                    st.dataframe(resultado['dados'])
 
                     # Exibir gráfico
                     chart = plot_asset_chart(acao, resultado['chart_data'])
@@ -497,5 +486,5 @@ def main():
                 st.info(f"Ações com recomendação neutra: {', '.join(resultados_neutros)}")
             
 if __name__ == "__main__":
-    st.session_state.setdefault('analise_iniciada', False) # Inicializa a variável de estado
+    st.session_state.setdefault('analise_iniciada', False)
     main()
